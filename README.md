@@ -90,6 +90,15 @@ boss kills and the hiscore-trackable roll/raid pets), or `data/pets.json`'s own 
 `attemptsPerHour` fields (skilling pets and the fixed-rate minigame/clue pets). Two pets are excluded
 from the wheel permanently regardless of any rate data — see "Known gaps" below.
 
+### Keeping up with new pets
+
+`check_pets.py` diffs `data/pets.json` against the wiki's `Category:Pets` and verifies every
+`itemId` against the pet's infobox (a wrong ID means ownership sync never matches, so the pet never
+leaves the hunt list). Run it locally with `python check_pets.py`; it exits 1 on drift. A GitHub
+Action (`.github/workflows/check-pets.yml`) runs it every Monday and on PRs that touch the data, and
+opens or updates a `pet-data` issue when something is missing. Pets that are deliberately not
+huntable (cats, quest followers, Beaver metamorphs) are listed in `IGNORED_PAGES` in the script.
+
 ## Known gaps
 
 - **Broav and Cat are permanently excluded from the wheel** (`build_pet_data.py`'s `EXCLUDED_PETS`):

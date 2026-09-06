@@ -33,7 +33,7 @@
   { "name": "Pet smoke devil", "itemId": 12648, "source": "Thermonuclear Smoke Devil", "type": "SOLO", "rarity": 3000, "wikiUrl": "https://oldschool.runescape.wiki/w/Pet_smoke_devil", "defaultTags": ["boss", "slayer"] },
   { "name": "Pet snakeling", "itemId": 12921, "source": "Zulrah", "type": "SOLO", "rarity": 4000, "wikiUrl": "https://oldschool.runescape.wiki/w/Pet_snakeling", "defaultTags": ["boss"] },
   { "name": "Pet zilyana", "itemId": 12651, "source": "Commander Zilyana (Saradomin GWD)", "type": "BOTH", "rarity": 5000, "wikiUrl": "https://oldschool.runescape.wiki/w/Pet_zilyana", "defaultTags": ["boss", "gwd"] },
-  { "name": "Phoenix", "itemId": 20693, "source": "Wintertodt", "type": "BOTH", "rarity": 5000, "wikiUrl": "https://oldschool.runescape.wiki/w/Phoenix_(pet)", "defaultTags": ["skilling", "minigame", "firemaking"] },
+  { "name": "Phoenix", "itemId": 20693, "source": "Wintertodt", "type": "BOTH", "rarity": 5000, "wikiUrl": "https://oldschool.runescape.wiki/w/Phoenix", "defaultTags": ["skilling", "minigame", "firemaking"] },
   { "name": "Prince black dragon", "itemId": 12653, "source": "King Black Dragon", "type": "BOTH", "rarity": 3000, "wikiUrl": "https://oldschool.runescape.wiki/w/Prince_black_dragon", "defaultTags": ["boss"] },
   { "name": "Scorpia's offspring", "itemId": 13181, "source": "Scorpia", "type": "BOTH", "rarity": 2016, "wikiUrl": "https://oldschool.runescape.wiki/w/Scorpia's_offspring", "defaultTags": ["boss", "wilderness"] },
   { "name": "Scurry", "itemId": 28801, "source": "Scurrius", "type": "BOTH", "rarity": 3000, "wikiUrl": "https://oldschool.runescape.wiki/w/Scurry", "defaultTags": ["boss"] },
@@ -47,7 +47,7 @@
   { "name": "Venenatis spiderling", "itemId": 13177, "source": "Venenatis / Spindel", "type": "BOTH", "rarity": 1500, "wikiUrl": "https://oldschool.runescape.wiki/w/Venenatis_spiderling", "defaultTags": ["boss", "wilderness"] },
   { "name": "Vet'ion jr.", "itemId": 13179, "source": "Vet'ion / Calvar'ion", "type": "BOTH", "rarity": 1500, "wikiUrl": "https://oldschool.runescape.wiki/w/Vet'ion_jr.", "defaultTags": ["boss", "wilderness"] },
   { "name": "Vorki", "itemId": 21992, "source": "Vorkath", "type": "SOLO", "rarity": 3000, "wikiUrl": "https://oldschool.runescape.wiki/w/Vorki", "defaultTags": ["boss"] },
-  { "name": "Wisp", "itemId": 28246, "source": "The Whisperer", "type": "SOLO", "rarity": 2000, "wikiUrl": "https://oldschool.runescape.wiki/w/Wisp_(pet)", "defaultTags": ["boss", "dt2"] },
+  { "name": "Wisp", "itemId": 28246, "source": "The Whisperer", "type": "SOLO", "rarity": 2000, "wikiUrl": "https://oldschool.runescape.wiki/w/Wisp", "defaultTags": ["boss", "dt2"] },
   { "name": "Yami", "itemId": 0, "source": "Yama", "type": "BOTH", "rarity": 2500, "wikiUrl": "https://oldschool.runescape.wiki/w/Yami", "defaultTags": ["boss"] },
 
   { "name": "Baby chinchompa", "itemId": 13324, "source": "Hunter", "type": "SOLO", "rarity": 80283, "wikiUrl": "https://oldschool.runescape.wiki/w/Baby_chinchompa", "defaultTags": ["skilling", "hunter"], "attemptUnit": "action", "rollsPerAttempt": 1, "attemptsPerHour": 800, "assumedRate": true, "editable": true, "womSkill": "hunter", "methodNote": "Black chinchompas via box trapping (OSRS Wiki: best pet odds among chinchompa colours at any level, though slower to catch than grey/red). Rate formula 1/(B - Lvl*25); black base 82,758 -> 1/80,283 at 99. ~800 catches/hr is an unverified estimate -- edit to your real rate. https://oldschool.runescape.wiki/w/Baby_chinchompa" },
