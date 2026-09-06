@@ -4,7 +4,7 @@ A spin-the-wheel picker for deciding which Old School RuneScape pet to hunt next
 long each one actually takes. It syncs your real boss KC and pet ownership so the wheel only ever
 lands on something you don't have yet.
 
-*(screenshot placeholder)*
+![Pet Hunt Wheel: player sync, hunt list, and spin wheel](docs/screenshot.png)
 
 ## Quick start
 
