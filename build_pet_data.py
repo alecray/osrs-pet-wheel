@@ -39,6 +39,7 @@ ROOT = Path(__file__).resolve().parent
 PETS_JSON_PATH = ROOT / "data/pets.json"
 PET_RANKER_PATH = ROOT / "pet_ranker.py"
 HTML_PATH = ROOT / "pet-wheel.html"
+ICON_DIR = ROOT / "data" / "icons"
 
 PET_DATA_BLOCK_RE = re.compile(
     r'(<script id="pet-data" type="application/json">\n).*?(\n</script>)',
@@ -368,7 +369,23 @@ def build_dataset():
     return dataset
 
 
+def icon_data_uri(name):
+    """Base64 data URI for data/icons/<slug>.png (fetch_pet_icons.py), or None."""
+    import base64
+    import re as _re
+    slug = _re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    path = ICON_DIR / (slug + ".png")
+    if not path.exists():
+        return None
+    return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+
+
 def inject(dataset):
+    for pet in dataset:
+        pet["icon"] = icon_data_uri(pet["name"])
+    missing = [p["name"] for p in dataset if not p["icon"]]
+    if missing:
+        print(f"Note: no icon for {len(missing)} pet(s) (run fetch_pet_icons.py): {', '.join(missing)}")
     html = HTML_PATH.read_text(encoding="utf-8")
     payload = json.dumps(dataset, indent=2)
     if not PET_DATA_BLOCK_RE.search(html):

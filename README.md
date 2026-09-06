@@ -82,6 +82,7 @@ tuple. `data/pets.json` is the same dataset the
 either source, regenerate it with:
 
 ```
+python fetch_pet_icons.py   # only after adding a pet: downloads its wiki icon into data/icons/
 python build_pet_data.py
 ```
 
@@ -125,6 +126,7 @@ huntable (cats, quest followers, Beaver metamorphs) are listed in `IGNORED_PAGES
 ## Credits
 
 - Rarity and rate data: the [OSRS Wiki](https://oldschool.runescape.wiki).
+- Pet icons in `data/icons/`: item images from the OSRS Wiki, [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/), fetched by `fetch_pet_icons.py`.
 - KC, clue, and skill data: [Wise Old Man](https://wiseoldman.net).
 - Pet ownership: [RuneProfile](https://runeprofile.com), via its RuneLite plugin.
 
