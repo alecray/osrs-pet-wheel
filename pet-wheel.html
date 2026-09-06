@@ -2875,18 +2875,25 @@ function getAudio() {
   return audioCtx;
 }
 
-/* Wooden "clack" as a slice boundary passes the pointer. `speed` in 0..1
- * raises pitch and volume a touch so fast spins sound busier. */
+/* Soft "tock" as a slice boundary passes the pointer. `speed` in 0..1
+ * nudges pitch and volume so fast spins sound a little busier. Ticks are
+ * rate-limited to TICK_MIN_GAP_MS so the fast phase never buzzes. */
+const TICK_MIN_GAP_MS = 70;
+let lastTickAt = 0;
 function playTick(speed) {
   const ac = getAudio();
   if (!ac) return;
+  const nowMs = performance.now();
+  if (nowMs - lastTickAt < TICK_MIN_GAP_MS) return;
+  lastTickAt = nowMs;
   const t = ac.currentTime;
   const osc = ac.createOscillator();
   const gain = ac.createGain();
-  osc.type = "triangle";
-  osc.frequency.setValueAtTime(900 + 500 * speed, t);
-  osc.frequency.exponentialRampToValueAtTime(250, t + 0.045);
-  gain.gain.setValueAtTime(0.18 + 0.12 * speed, t);
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(420 + 120 * speed, t);
+  osc.frequency.exponentialRampToValueAtTime(180, t + 0.04);
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.06 + 0.04 * speed, t + 0.004);
   gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
   osc.connect(gain).connect(ac.destination);
   osc.start(t);
