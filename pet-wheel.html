@@ -239,6 +239,11 @@
   .pet-icon{ width: 22px; height: 22px; object-fit: contain; image-rendering: pixelated; vertical-align: middle; margin-right: 7px; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.9)); }
   .num{ text-align: right; font-variant-numeric: tabular-nums; }
   .muted{ color: var(--muted); }
+  .dry-spooned{ color: var(--green); }
+  .dry-onrate{ color: var(--muted); }
+  .dry-dry{ color: var(--gold); }
+  .dry-verydry{ color: var(--red); font-weight: 600; }
+  .kc-delta{ color: var(--green); font-size: 0.88em; }
   .assumed::after{ content: "~"; color: var(--muted); margin-left: 2px; }
   #hunt-table-body input[type="number"]{ width: 64px; padding: 2px 4px; font-size: 0.92em; }
   .reset-btn{ padding: 3px 8px; font-size: 0.7em; }
@@ -454,6 +459,7 @@
             <th class="num">KC / Lvl</th>
             <th class="num">Chance so far</th>
             <th class="num">P(dry)</th>
+            <th class="num" title="Expected rolls to date &divide; rarity -- 1.0x is at drop rate">Dry</th>
             <th>Boost</th>
             <th></th>
           </tr>
@@ -465,6 +471,7 @@
 
   <div class="panel"><div class="corner-b"></div>
     <h2>3. Spin</h2>
+    <p class="hint" id="sync-nudge" style="display:none;"></p>
     <div class="row" style="margin-bottom:8px;">
       <label for="session-minutes" class="muted">Session length</label>
       <input type="number" id="session-minutes" min="1" step="5" value="90">
@@ -491,6 +498,8 @@
         <span class="muted">(&asymp; <span id="result-minutes"></span> min)</span>
       </div>
       <div class="muted" id="result-chance-session"></div>
+      <div class="muted" id="result-dryometer"></div>
+      <div class="muted" id="result-milestone"></div>
       <div class="row" style="margin-top:8px;">
         <button class="secondary" id="reroll-chunk-btn">Reroll chunk</button>
         <button class="secondary" id="remove-hunt-btn" title="Untick this pet in the hunt list so it leaves the wheel">Remove from hunts</button>
@@ -1924,6 +1933,7 @@ const CHUNK_MIN = 1;
 const CHUNK_MAX = 750;
 const CHUNK_STEPS = [1, 2, 3, 5, 10, 15, 20, 25, 50, 75, 100, 150, 200, 250, 300, 500, 750];
 const WOM_STALE_MS = 24 * 60 * 60 * 1000; // 24h
+const SYNC_NUDGE_MS = 3 * 24 * 3600 * 1000; // 3 days -- nudge to refresh kc on the spin panel
 
 function accountKey(suffix) {
   const slug = (rsn || "default").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_") || "default";
@@ -1943,6 +1953,7 @@ try {
 let rsn = "";                 // current player, drives the localStorage namespace
 let snapshot = null;          // parsed pet_ranker.py --json snapshot, or null (optional fallback)
 let womPlayer = null;         // { fetched_at, bosses: {metric: kills} } from WOM /players/{rsn}
+let womPlayerPrev = null;     // the womPlayer snapshot from before the most recent fetch, for kc deltas
 let womRates = null;          // { fetched_at, rates: {boss: killsPerHour} } from WOM efficiency rates (global)
 let huntingSet = new Set();   // pet names currently selected for the wheel
 let boosts = {};              // pet name -> 0.5 | 1 | 2 user weight multiplier
@@ -1987,6 +1998,10 @@ function loadState() {
   const rawWomPlayer = lsGet(accountKey("womPlayer.v1"));
   if (rawWomPlayer) {
     try { womPlayer = JSON.parse(rawWomPlayer); } catch (err) { womPlayer = null; }
+  }
+  const rawWomPlayerPrev = lsGet(accountKey("womPlayerPrev.v1"));
+  if (rawWomPlayerPrev) {
+    try { womPlayerPrev = JSON.parse(rawWomPlayerPrev); } catch (err) { womPlayerPrev = null; }
   }
   const rawHunting = lsGet(accountKey("hunting.v1"));
   if (rawHunting) {
@@ -2033,6 +2048,10 @@ function saveWomPlayer() {
   if (womPlayer) lsSet(accountKey("womPlayer.v1"), JSON.stringify(womPlayer));
   else lsRemove(accountKey("womPlayer.v1"));
 }
+function saveWomPlayerPrev() {
+  if (womPlayerPrev) lsSet(accountKey("womPlayerPrev.v1"), JSON.stringify(womPlayerPrev));
+  else lsRemove(accountKey("womPlayerPrev.v1"));
+}
 function saveWomRates() {
   if (womRates) lsSet(LS_WOM_RATES, JSON.stringify(womRates));
   else lsRemove(LS_WOM_RATES);
@@ -2046,12 +2065,14 @@ function saveWomRates() {
 function switchAccount(newRsn) {
   rsn = newRsn;
   saveCurrentRsn();
-  snapshot = null; womPlayer = null; huntingSet = new Set(); boosts = {}; history = [];
+  snapshot = null; womPlayer = null; womPlayerPrev = null; huntingSet = new Set(); boosts = {}; history = [];
   sessionMinutes = 90; activeCategory = "all"; overrides = {};
   const rawSnapshot = lsGet(accountKey("snapshot.v1"));
   if (rawSnapshot) { try { snapshot = JSON.parse(rawSnapshot); } catch (err) { /* ignore */ } }
   const rawWomPlayer = lsGet(accountKey("womPlayer.v1"));
   if (rawWomPlayer) { try { womPlayer = JSON.parse(rawWomPlayer); } catch (err) { /* ignore */ } }
+  const rawWomPlayerPrev = lsGet(accountKey("womPlayerPrev.v1"));
+  if (rawWomPlayerPrev) { try { womPlayerPrev = JSON.parse(rawWomPlayerPrev); } catch (err) { /* ignore */ } }
   const rawHunting = lsGet(accountKey("hunting.v1"));
   if (rawHunting) { try { huntingSet = new Set(JSON.parse(rawHunting)); } catch (err) { /* ignore */ } }
   const rawBoosts = lsGet(accountKey("boosts.v1"));
@@ -2102,6 +2123,8 @@ function recomputePets() {
   const womBosses = (womPlayer && womPlayer.bosses) ? womPlayer.bosses : {};
   const womActivities = (womPlayer && womPlayer.activities) ? womPlayer.activities : {};
   const womSkills = (womPlayer && womPlayer.skills) ? womPlayer.skills : {};
+  const womBossesPrev = (womPlayerPrev && womPlayerPrev.bosses) ? womPlayerPrev.bosses : {};
+  const womActivitiesPrev = (womPlayerPrev && womPlayerPrev.activities) ? womPlayerPrev.activities : {};
   const rates = (womRates && womRates.rates) ? womRates.rates : {};
 
   pets = DEFAULT_PETS.map(function (p) {
@@ -2119,6 +2142,13 @@ function recomputePets() {
       kc = kcByActivity[p.activity];
       kcSource = "hiscores";
     }
+
+    let kcPrev = null;
+    const womTablePrev = p.womType === "activity" ? womActivitiesPrev : womBossesPrev;
+    if (p.wom && Object.prototype.hasOwnProperty.call(womTablePrev, p.wom) && womTablePrev[p.wom] !== -1) {
+      kcPrev = womTablePrev[p.wom];
+    }
+    const kcDelta = (kc !== null && kcPrev !== null) ? kc - kcPrev : null;
 
     const skillLevel = p.womSkill && Object.prototype.hasOwnProperty.call(womSkills, p.womSkill)
       ? womSkills[p.womSkill] : null;
@@ -2145,6 +2175,8 @@ function recomputePets() {
       editable: editable,
       kc: kc,
       kcSource: kcSource,
+      kcPrev: kcPrev,
+      kcDelta: kcDelta,
       skillLevel: skillLevel,
       rarity: rarity,
       rollsPerAttempt: rollsPerAttempt,
@@ -2212,7 +2244,16 @@ async function fetchWomPlayer(name) {
   if (data && data.skills) {
     Object.keys(data.skills).forEach(function (metric) { skills[metric] = data.skills[metric].level; });
   }
-  womPlayer = { fetched_at: new Date().toISOString(), bosses: bosses, activities: activities, skills: skills };
+  const newPlayer = { fetched_at: new Date().toISOString(), bosses: bosses, activities: activities, skills: skills };
+  // Stash the outgoing snapshot as the "previous" baseline for kc-delta
+  // math, but only if it's not already the stashed one -- otherwise a
+  // second fetch shortly after the first would overwrite a real older
+  // baseline with a near-duplicate of the current data.
+  if (womPlayer && (!womPlayerPrev || womPlayerPrev.fetched_at !== womPlayer.fetched_at)) {
+    womPlayerPrev = womPlayer;
+    saveWomPlayerPrev();
+  }
+  womPlayer = newPlayer;
   saveWomPlayer();
   return womPlayer;
 }
@@ -2229,6 +2270,41 @@ function formatAge(iso) {
   return Math.round(hours / 24) + "d ago";
 }
 
+function formatDaysAgo(iso) {
+  const ms = Date.now() - Date.parse(iso);
+  if (Number.isNaN(ms)) return "a while ago";
+  const days = Math.round(ms / (24 * 3600 * 1000));
+  return days <= 1 ? "1 day ago" : days + " days ago";
+}
+
+/* ---------------------------------------------------------------------
+ * Nudge above the wheel to refresh kc when it's gotten stale (or was
+ * never synced) -- separate from the more granular #wom-staleness line,
+ * this one is meant to be seen right before spinning.
+ * ------------------------------------------------------------------- */
+function renderSyncNudge() {
+  const el = document.getElementById("sync-nudge");
+  el.innerHTML = "";
+  let text = null;
+  if (womPlayer && (Date.now() - Date.parse(womPlayer.fetched_at)) > SYNC_NUDGE_MS) {
+    text = "Player KC last synced " + formatDaysAgo(womPlayer.fetched_at) + " — ";
+  } else if (!womPlayer && rsn) {
+    text = "No KC synced yet — ";
+  }
+  if (!text) { el.style.display = "none"; return; }
+  el.appendChild(document.createTextNode(text));
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "secondary";
+  btn.textContent = womPlayer ? "Refresh now" : "Fetch from Wise Old Man";
+  btn.addEventListener("click", function () {
+    const fetchBtn = document.getElementById("fetch-wom-btn");
+    if (fetchBtn) fetchBtn.click();
+  });
+  el.appendChild(btn);
+  el.style.display = "block";
+}
+
 function renderWomStaleness() {
   const el = document.getElementById("wom-staleness");
   const parts = [];
@@ -2237,7 +2313,14 @@ function renderWomStaleness() {
     parts.push("Kill-rate table: " + age + (Date.now() - Date.parse(womRates.fetched_at) > WOM_STALE_MS ? " (stale, will refresh on next fetch)" : ""));
   }
   if (womPlayer) {
-    parts.push("Player KC: " + formatAge(womPlayer.fetched_at));
+    let line = "Player KC: " + formatAge(womPlayer.fetched_at);
+    if (womPlayerPrev) {
+      const totalDelta = pets.reduce(function (sum, p) { return sum + (p.kcDelta > 0 ? p.kcDelta : 0); }, 0);
+      if (totalDelta > 0) {
+        line += " • +" + totalDelta.toLocaleString() + " kc since " + formatAge(womPlayerPrev.fetched_at);
+      }
+    }
+    parts.push(line);
   }
   el.textContent = parts.join(" • ");
 }
@@ -2548,6 +2631,13 @@ function renderHuntTable() {
     } else {
       tdKc.textContent = p.kc === null ? "?" : p.kc.toLocaleString();
       if (p.kc !== null) tdKc.title = "source: " + p.kcSource;
+      if (p.kcDelta > 0) {
+        const deltaSpan = document.createElement("span");
+        deltaSpan.className = "kc-delta";
+        deltaSpan.textContent = " +" + p.kcDelta.toLocaleString();
+        deltaSpan.title = "kc gained since the previous Wise Old Man fetch";
+        tdKc.appendChild(deltaSpan);
+      }
     }
 
     const tdChance = document.createElement("td");
@@ -2557,6 +2647,17 @@ function renderHuntTable() {
     const tdDry = document.createElement("td");
     tdDry.className = "num";
     tdDry.textContent = (p.dryChance * 100).toFixed(1) + "%";
+
+    const tdDryMeter = document.createElement("td");
+    const dryInfo = drynessInfo(p);
+    if (dryInfo) {
+      tdDryMeter.className = "num " + dryInfo.cls;
+      tdDryMeter.textContent = dryInfo.multiplier.toFixed(1) + "x";
+      tdDryMeter.title = dryInfo.pct.toFixed(0) + "% of hunters would have it by now (" + dryInfo.word + ")";
+    } else {
+      tdDryMeter.className = "num muted";
+      tdDryMeter.textContent = "–";
+    }
 
     const tdBoost = document.createElement("td");
     const boostSelect = document.createElement("select");
@@ -2595,7 +2696,7 @@ function renderHuntTable() {
     hideBtn.addEventListener("click", function () { setHidden(p.name, true); });
     tdReset.appendChild(hideBtn);
 
-    tr.append(tdCheck, tdName, tdSource, tdRate, tdAttemptsPerHour, tdHours, tdKc, tdChance, tdDry, tdBoost, tdReset);
+    tr.append(tdCheck, tdName, tdSource, tdRate, tdAttemptsPerHour, tdHours, tdKc, tdChance, tdDry, tdDryMeter, tdBoost, tdReset);
     body.appendChild(tr);
   });
 }
@@ -3315,6 +3416,60 @@ function unitLabel(pet, count) {
   return count === 1 ? label.replace(/s$/, "") : label;
 }
 
+/* ---------------------------------------------------------------------
+ * Dry-o-meter: how far above/below drop rate the player's kc sits.
+ * multiplier 1.0 = exactly at drop rate (expected rolls == rarity).
+ * pct = "% of hunters would already have it" = pet.chance (same maths
+ * already used for the hunt table's Chance/P(dry) columns).
+ * ------------------------------------------------------------------- */
+function drynessInfo(pet) {
+  if (pet.kc === null || pet.kc <= 0) return null;
+  const rollsSoFar = pet.kc * pet.rollsPerAttempt;
+  const multiplier = rollsSoFar / pet.rarity;
+  const pct = pet.chance * 100;
+  let cls, word;
+  if (multiplier < 0.5) { cls = "dry-spooned"; word = "spooned territory"; }
+  else if (multiplier <= 1.5) { cls = "dry-onrate"; word = "on rate"; }
+  else if (multiplier <= 3) { cls = "dry-dry"; word = "dry"; }
+  else { cls = "dry-verydry"; word = "very dry"; }
+  return { multiplier: multiplier, pct: pct, cls: cls, word: word };
+}
+
+/* ---------------------------------------------------------------------
+ * "Next: 88 kills to 1,000 kc • 412 kills to drop rate" -- the nearest
+ * one or two upcoming targets: hitting 1x/2x drop rate (whichever the
+ * player hasn't reached yet) and the next round-number kc milestone.
+ * Items are sorted by how many more attempts each needs, closest first.
+ * ------------------------------------------------------------------- */
+const KC_MILESTONES = [100, 250, 500, 1000, 2000, 5000, 10000];
+
+function nextMilestoneText(pet) {
+  if (pet.kc === null) return "";
+  const rollsSoFar = pet.kc * pet.rollsPerAttempt;
+  const multiplier = rollsSoFar / pet.rarity;
+  const items = [];
+
+  if (multiplier < 1) {
+    const rollsNeeded = pet.rarity - rollsSoFar;
+    const n = Math.max(1, Math.ceil(rollsNeeded / pet.rollsPerAttempt));
+    items.push({ n: n, text: n.toLocaleString() + " more " + unitLabel(pet, n) + " to reach 1x drop rate" });
+  } else if (multiplier < 2) {
+    const rollsNeeded = (2 * pet.rarity) - rollsSoFar;
+    const n = Math.max(1, Math.ceil(rollsNeeded / pet.rollsPerAttempt));
+    items.push({ n: n, text: n.toLocaleString() + " more " + unitLabel(pet, n) + " to 2x drop rate" });
+  }
+
+  const nextMilestone = KC_MILESTONES.find(function (m) { return m > pet.kc; });
+  if (nextMilestone) {
+    const n = nextMilestone - pet.kc;
+    items.push({ n: n, text: n.toLocaleString() + " " + unitLabel(pet, n) + " to " + nextMilestone.toLocaleString() + " kc" });
+  }
+
+  if (items.length === 0) return "";
+  items.sort(function (a, b) { return a.n - b.n; });
+  return "Next: " + items.slice(0, 2).map(function (it) { return it.text; }).join(" • ");
+}
+
 function showResult(pet, chunk) {
   document.getElementById("result-name").textContent = pet.name;
   document.getElementById("result-source").textContent = pet.source + " • 1/" + pet.rarity
@@ -3335,6 +3490,21 @@ function showResult(pet, chunk) {
   document.getElementById("result-minutes").textContent = chunk.minutes.toLocaleString();
   document.getElementById("result-chance-session").textContent =
     "P(pet this session) ≈ " + (chunk.chanceThisSession * 100).toFixed(1) + "%";
+  const dryEl = document.getElementById("result-dryometer");
+  const dryInfo = drynessInfo(pet);
+  if (dryInfo) {
+    dryEl.innerHTML = "Dry-o-meter: " + dryInfo.multiplier.toFixed(1) + "x drop rate ("
+      + '<span class="' + dryInfo.cls + '">' + dryInfo.word + "</span>), "
+      + dryInfo.pct.toFixed(0) + "% of hunters would have it by now";
+    dryEl.style.display = "block";
+  } else {
+    dryEl.textContent = "";
+    dryEl.style.display = "none";
+  }
+  const milestoneEl = document.getElementById("result-milestone");
+  const milestoneText = nextMilestoneText(pet);
+  milestoneEl.textContent = milestoneText;
+  milestoneEl.style.display = milestoneText ? "block" : "none";
   document.getElementById("result-card").classList.add("show");
 }
 
@@ -3478,6 +3648,7 @@ function render() {
   document.getElementById("rsn-label").textContent = rsn ? rsn : "no player set";
   document.getElementById("rsn-input").value = rsn;
   renderWomStaleness();
+  renderSyncNudge();
   sessionInput.value = String(sessionMinutes);
   renderCategoryTabs();
   renderHuntTable();
