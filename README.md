@@ -50,7 +50,9 @@ obtain." Pets with fewer expected hours remaining get proportionally more slices
 grind that's closest to paying off shows up more often. Before a session, pick a "chunk" length (in
 minutes); the wheel does one weighted spin and tells you how many attempts of the chosen pet's
 activity fit in that chunk, so you get a concrete task ("14 Zulrah kills") instead of an abstract pet
-name.
+name. The **Feeling lucky** toggle beside the Spin button additionally biases the wheel toward
+whichever hunted pets are furthest past their expected KC for a drop (rolls-so-far / rarity), without
+changing any displayed chance, P(dry), or expected-hours figure.
 
 ## Editable rates
 

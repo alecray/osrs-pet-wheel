@@ -471,6 +471,7 @@
     <div class="spin-row">
       <button id="spin-btn">Spin (space)</button>
       <button class="secondary" id="mute-btn" title="Toggle spin sounds">🔊</button>
+      <button class="secondary" id="lucky-btn" title="Bias the wheel toward hunted pets you're driest on (KC x rolls / rarity), without changing their displayed chance or P(dry)">Feeling lucky: off</button>
     </div>
     <div id="result-card">
       <div class="pet-name" id="result-name"></div>
@@ -2676,29 +2677,57 @@ document.getElementById("select-top8-btn").addEventListener("click", function ()
 /* ---------------------------------------------------------------------
  * Wheel weighting + drawing
  *
- * Weight formula (2026-09-05 refinement):
+ * Weight formula (2026-09-05 refinement; lucky-mode factor added
+ * 2026-09-06):
  *   H  = expectedHours(p)
  *   w  = 1 / (H + H0) ^ k         H0 = 3.0h softening constant, k = 0.75
  *   w  = clamp(w, wMax / R, wMax) R = 25 -- caps the odds spread at 25:1
  *                                    so even Skotos-tier pets keep a slice
  *   w  = w * boost(p)             0.5x / 1x / 2x, user-set per pet
+ *   w  = w * luck(p)              only when "Feeling lucky" is on -- see
+ *                                    dryLuckFactor() below
  *
  * H0 stops any single sub-hour pet from swallowing the wheel; k < 1
  * favours quick pets without making a 10x-slower pet 10x less likely;
  * the 25:1 clamp is applied AFTER ranking by raw weight so the fastest
  * hunted pet sets wMax and everything else is floored relative to it.
  * boost is a pure user dial and never affects P(dry)/chance displays.
+ * luck(p) is likewise a pure wheel-bias dial: it reads kc/rarity but
+ * never changes chance/dryChance/expectedHours, so the hunt table and
+ * result card are unaffected by whether the mode is on.
  * ------------------------------------------------------------------- */
 const WEIGHT_H0 = 3.0;
 const WEIGHT_K = 0.75;
 const WEIGHT_MAX_SPREAD = 25;
 
+/* Feeling-lucky dryness factor: how far past "expected" a pet's own KC is,
+ * relative to its rarity. dryness = (kc * rollsPerAttempt) / rarity, i.e.
+ * rolls-so-far divided by rolls-for-even-odds; a pet with no KC data (null
+ * or 0) is treated as dryness 0, which floors the factor at 0.5 -- lucky
+ * mode never zeroes out a pet, it only leans the wheel toward whichever
+ * hunted pets are running driest. */
+const LUCKY_FACTOR_MIN = 0.5;
+const LUCKY_FACTOR_MAX = 4;
+function dryLuckFactor(p) {
+  const kc = p.kc || 0;
+  const dryness = (kc * p.rollsPerAttempt) / p.rarity;
+  return Math.min(LUCKY_FACTOR_MAX, Math.max(LUCKY_FACTOR_MIN, LUCKY_FACTOR_MIN + dryness));
+}
+function isLuckyMode() {
+  return lsGet(accountKey("lucky.v1")) === "on";
+}
+
 function computeWeightedSlices(huntedPets) {
   if (huntedPets.length === 0) return [];
+  const luckyOn = isLuckyMode();
   const raw = huntedPets.map(function (p) { return 1 / Math.pow(p.expectedHours + WEIGHT_H0, WEIGHT_K); });
   const wMax = Math.max.apply(null, raw);
   const wFloor = wMax / WEIGHT_MAX_SPREAD;
-  const weights = huntedPets.map(function (p, i) { return Math.max(raw[i], wFloor) * p.boost; });
+  const weights = huntedPets.map(function (p, i) {
+    let w = Math.max(raw[i], wFloor) * p.boost;
+    if (luckyOn) w *= dryLuckFactor(p);
+    return w;
+  });
   const total = weights.reduce(function (a, b) { return a + b; }, 0);
 
   let angle = 0;
@@ -3034,6 +3063,16 @@ function renderMuteBtn() {
 }
 renderMuteBtn();
 
+document.getElementById("lucky-btn").addEventListener("click", function () {
+  lsSet(accountKey("lucky.v1"), isLuckyMode() ? "off" : "on");
+  renderLuckyBtn();
+  drawWheel();
+});
+function renderLuckyBtn() {
+  document.getElementById("lucky-btn").textContent = "Feeling lucky: " + (isLuckyMode() ? "on" : "off");
+}
+renderLuckyBtn();
+
 function pickWeightedWinner(slices) {
   const roll = Math.random() * slices.reduce(function (sum, s) { return sum + s.weight; }, 0);
   let acc = 0;
@@ -3334,6 +3373,7 @@ function render() {
   renderHuntingCount();
   renderOwnedList();
   renderHiddenList();
+  renderLuckyBtn();
   drawWheel();
   renderHistory();
 }
