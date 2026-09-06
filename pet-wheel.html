@@ -328,7 +328,9 @@
     z-index: 4;
     transform-origin: 50% -34px; /* pivot at the knob above the tip */
   }
-  #mute-btn{ padding: 11px 14px; font-size: 1.05em; }
+  #mute-btn{ padding: 7px 12px; font-size: 1em; }
+  .spin-options{ display:flex; justify-content:center; flex-wrap: wrap; margin-top: 12px; gap: 8px; }
+  .spin-options .secondary{ font-size: 0.85em; padding: 7px 12px; }
   .pointer::before{
     content: ""; position:absolute; left: -7px; top: -34px; width: 0; height: 0;
     border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 24px solid #fbe8a8;
@@ -486,6 +488,8 @@
     </div>
     <div class="spin-row">
       <button id="spin-btn">Spin (space)</button>
+    </div>
+    <div class="spin-options">
       <button class="secondary" id="mute-btn" title="Toggle spin sounds">🔊</button>
       <button class="secondary" id="lucky-btn" title="Bias the wheel toward hunted pets you're driest on (KC x rolls / rarity), without changing their displayed chance or P(dry)">Feeling lucky: off</button>
       <button class="secondary" id="auto-remove-btn" title="When on, the pet you land on is unticked from the hunt list so the next spin can't repeat it">Auto remove: off</button>
