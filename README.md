@@ -58,6 +58,8 @@ name.
   rarity as a multiplier (1.0x = exactly at drop rate), colour-coded from "spooned territory" (green)
   through "on rate" to "dry"/"very dry" (red), plus the percentage of hunters who'd already have the
   pet at your kc.
+- **Next milestone** — the result card also names the nearest upcoming target(s): hitting 1x/2x drop
+  rate, and the next round-number kc milestone (100, 250, 500, 1,000, 2,000, 5,000, 10,000).
 
 ## Editable rates
 

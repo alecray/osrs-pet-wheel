@@ -488,6 +488,7 @@
       </div>
       <div class="muted" id="result-chance-session"></div>
       <div class="muted" id="result-dryometer"></div>
+      <div class="muted" id="result-milestone"></div>
       <div class="row" style="margin-top:8px;">
         <button class="secondary" id="reroll-chunk-btn">Reroll chunk</button>
         <button class="secondary" id="remove-hunt-btn" title="Untick this pet in the hunt list so it leaves the wheel">Remove from hunts</button>
@@ -3247,6 +3248,41 @@ function drynessInfo(pet) {
   return { multiplier: multiplier, pct: pct, cls: cls, word: word };
 }
 
+/* ---------------------------------------------------------------------
+ * "Next: 88 kills to 1,000 kc • 412 kills to drop rate" -- the nearest
+ * one or two upcoming targets: hitting 1x/2x drop rate (whichever the
+ * player hasn't reached yet) and the next round-number kc milestone.
+ * Items are sorted by how many more attempts each needs, closest first.
+ * ------------------------------------------------------------------- */
+const KC_MILESTONES = [100, 250, 500, 1000, 2000, 5000, 10000];
+
+function nextMilestoneText(pet) {
+  if (pet.kc === null) return "";
+  const rollsSoFar = pet.kc * pet.rollsPerAttempt;
+  const multiplier = rollsSoFar / pet.rarity;
+  const items = [];
+
+  if (multiplier < 1) {
+    const rollsNeeded = pet.rarity - rollsSoFar;
+    const n = Math.max(1, Math.ceil(rollsNeeded / pet.rollsPerAttempt));
+    items.push({ n: n, text: n.toLocaleString() + " more " + unitLabel(pet, n) + " to reach 1x drop rate" });
+  } else if (multiplier < 2) {
+    const rollsNeeded = (2 * pet.rarity) - rollsSoFar;
+    const n = Math.max(1, Math.ceil(rollsNeeded / pet.rollsPerAttempt));
+    items.push({ n: n, text: n.toLocaleString() + " more " + unitLabel(pet, n) + " to 2x drop rate" });
+  }
+
+  const nextMilestone = KC_MILESTONES.find(function (m) { return m > pet.kc; });
+  if (nextMilestone) {
+    const n = nextMilestone - pet.kc;
+    items.push({ n: n, text: n.toLocaleString() + " " + unitLabel(pet, n) + " to " + nextMilestone.toLocaleString() + " kc" });
+  }
+
+  if (items.length === 0) return "";
+  items.sort(function (a, b) { return a.n - b.n; });
+  return "Next: " + items.slice(0, 2).map(function (it) { return it.text; }).join(" • ");
+}
+
 function showResult(pet, chunk) {
   document.getElementById("result-name").textContent = pet.name;
   document.getElementById("result-source").textContent = pet.source + " • 1/" + pet.rarity
@@ -3278,6 +3314,10 @@ function showResult(pet, chunk) {
     dryEl.textContent = "";
     dryEl.style.display = "none";
   }
+  const milestoneEl = document.getElementById("result-milestone");
+  const milestoneText = nextMilestoneText(pet);
+  milestoneEl.textContent = milestoneText;
+  milestoneEl.style.display = milestoneText ? "block" : "none";
   document.getElementById("result-card").classList.add("show");
 }
 
