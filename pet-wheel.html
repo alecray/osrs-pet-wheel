@@ -315,12 +315,6 @@
     z-index: 4;
     transform-origin: 50% -34px; /* pivot at the knob above the tip */
   }
-  .pointer.tick{ animation: pointer-kick 140ms ease-out; }
-  @keyframes pointer-kick{
-    0%   { transform: translateX(-50%) rotate(0deg); }
-    30%  { transform: translateX(-50%) rotate(-14deg); }
-    100% { transform: translateX(-50%) rotate(0deg); }
-  }
   #mute-btn{ padding: 11px 14px; font-size: 1.05em; }
   .pointer::before{
     content: ""; position:absolute; left: -7px; top: -34px; width: 0; height: 0;
@@ -2875,63 +2869,120 @@ function getAudio() {
   return audioCtx;
 }
 
-/* Soft "tock" as a slice boundary passes the pointer. `speed` in 0..1
- * nudges pitch and volume so fast spins sound a little busier. Ticks are
- * rate-limited to TICK_MIN_GAP_MS so the fast phase never buzzes. */
-const TICK_MIN_GAP_MS = 70;
+/* Tick: a short band-passed noise burst (the "clack" of the flapper hitting
+ * the peg) plus a damped sine body. Pitch, brightness, gain and decay all
+ * jitter per hit and scale with impact speed, so no two ticks sound alike.
+ * `omega` is wheel angular speed in rad/s. */
+const TICK_MIN_GAP_MS = 60;
 let lastTickAt = 0;
-function playTick(speed) {
+let noiseBuffer = null;
+function getNoiseBuffer(ac) {
+  if (noiseBuffer) return noiseBuffer;
+  const n = Math.floor(ac.sampleRate * 0.1);
+  noiseBuffer = ac.createBuffer(1, n, ac.sampleRate);
+  const d = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  return noiseBuffer;
+}
+function playTick(omega) {
   const ac = getAudio();
   if (!ac) return;
   const nowMs = performance.now();
   if (nowMs - lastTickAt < TICK_MIN_GAP_MS) return;
   lastTickAt = nowMs;
+
+  const v = Math.min(1, omega / 25);             // impact strength 0..1
+  const jit = function (amt) { return 1 + (Math.random() - 0.5) * amt; };
   const t = ac.currentTime;
+
+  const master = ac.createGain();
+  master.gain.setValueAtTime((0.035 + 0.05 * v) * jit(0.3), t);
+  master.connect(ac.destination);
+
+  // Impact transient: filtered noise, brighter when hit harder.
+  const noise = ac.createBufferSource();
+  noise.buffer = getNoiseBuffer(ac);
+  const bp = ac.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.setValueAtTime((1400 + 1600 * v) * jit(0.2), t);
+  bp.Q.setValueAtTime(4 + 4 * v, t);
+  const ng = ac.createGain();
+  ng.gain.setValueAtTime(0.0001, t);
+  ng.gain.linearRampToValueAtTime(0.9, t + 0.002);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.03 * jit(0.4));
+  noise.connect(bp).connect(ng).connect(master);
+  noise.start(t);
+  noise.stop(t + 0.08);
+
+  // Body: damped low sine, the wood/plastic "tock" that follows the clack.
   const osc = ac.createOscillator();
-  const gain = ac.createGain();
   osc.type = "sine";
-  osc.frequency.setValueAtTime(420 + 120 * speed, t);
-  osc.frequency.exponentialRampToValueAtTime(180, t + 0.04);
-  gain.gain.setValueAtTime(0.0001, t);
-  gain.gain.exponentialRampToValueAtTime(0.06 + 0.04 * speed, t + 0.004);
-  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
-  osc.connect(gain).connect(ac.destination);
+  osc.frequency.setValueAtTime((320 + 160 * v) * jit(0.15), t);
+  osc.frequency.exponentialRampToValueAtTime(170, t + 0.05);
+  const og = ac.createGain();
+  og.gain.setValueAtTime(0.0001, t);
+  og.gain.linearRampToValueAtTime(0.5, t + 0.004);
+  og.gain.exponentialRampToValueAtTime(0.0001, t + (0.08 + 0.06 * (1 - v)) * jit(0.4));
+  osc.connect(og).connect(master);
   osc.start(t);
-  osc.stop(t + 0.06);
+  osc.stop(t + 0.2);
 }
 
-/* Short ascending chime when the wheel lands. */
-function playWin() {
-  const ac = getAudio();
-  if (!ac) return;
-  const t0 = ac.currentTime;
-  [523.25, 659.25, 783.99, 1046.5].forEach(function (freq, i) {
-    const t = t0 + i * 0.09;
-    const osc = ac.createOscillator();
-    const gain = ac.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(freq, t);
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.22, t + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
-    osc.connect(gain).connect(ac.destination);
-    osc.start(t);
-    osc.stop(t + 0.4);
-  });
-}
+/* Pointer flapper physics. The flapper is a spring/damper hinged at its
+ * knob. While a peg (slice boundary) is within PEG_CONTACT_RAD behind the
+ * pointer it drags the flapper toward PEG_PUSH_RAD, easing off as the peg
+ * moves away, so a crawling wheel visibly bends the flapper and lets it
+ * slide off. A fresh peg hit also adds velocity in proportion to wheel
+ * speed, so a fast wheel makes it flutter and overshoot. */
+const FLAP_K = 700;            // spring stiffness
+const FLAP_C = 2 * Math.sqrt(FLAP_K) * 0.32; // under-damped: visible overshoot
+const PEG_CONTACT_RAD = 0.10;  // how far past the pointer a peg still drags
+const PEG_PUSH_RAD = 0.30;     // max deflection from a slow drag (~17deg)
+const PEG_IMPULSE = 0.22;      // rad/s of flapper velocity per rad/s of wheel
+let flapAngle = 0, flapVel = 0, flapLastPeg = -1;
 
-function kickPointer() {
-  const el = document.querySelector(".pointer");
-  el.classList.remove("tick");
-  void el.offsetWidth; // restart the CSS animation
-  el.classList.add("tick");
-}
-
-function sliceIndexAt(slices, wheelAngle) {
+function pegBehindPointer(slices, wheelAngle) {
+  // Nearest boundary that has just passed the pointer, and how far past it is.
+  let best = -1, bestD = Infinity;
   for (let i = 0; i < slices.length; i++) {
-    if (wheelAngle >= slices[i].start && wheelAngle < slices[i].end) return i;
+    const d = normalizeAngle(slices[i].start - wheelAngle);
+    if (d < bestD) { bestD = d; best = i; }
   }
-  return slices.length - 1;
+  return { index: best, dist: bestD };
+}
+
+function stepFlapper(dt, slices, wheelAngle, omega) {
+  let target = 0;
+  if (slices) {
+    const peg = pegBehindPointer(slices, wheelAngle);
+    if (peg.dist < PEG_CONTACT_RAD) {
+      target = PEG_PUSH_RAD * (1 - peg.dist / PEG_CONTACT_RAD);
+      if (peg.index !== flapLastPeg) {
+        flapLastPeg = peg.index;
+        flapVel += Math.min(omega, 40) * PEG_IMPULSE;
+        playTick(omega);
+      }
+    }
+  }
+  const acc = FLAP_K * (target - flapAngle) - FLAP_C * flapVel;
+  flapVel += acc * dt;
+  flapAngle += flapVel * dt;
+  if (flapAngle > 0.6) { flapAngle = 0.6; flapVel = Math.min(0, flapVel); }
+  if (flapAngle < -0.12) { flapAngle = -0.12; flapVel = Math.max(0, flapVel); }
+  document.querySelector(".pointer").style.transform =
+    "translateX(-50%) rotate(" + (flapAngle * 180 / Math.PI).toFixed(2) + "deg)";
+}
+
+/* After the wheel stops, let the flapper finish its wobble on its own. */
+function settleFlapper() {
+  let last = performance.now();
+  function f(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    stepFlapper(dt, null, 0, 0);
+    if (Math.abs(flapVel) > 0.02 || Math.abs(flapAngle) > 0.002) requestAnimationFrame(f);
+    else { flapAngle = 0; flapVel = 0; stepFlapper(0, null, 0, 0); }
+  }
+  requestAnimationFrame(f);
 }
 
 document.getElementById("mute-btn").addEventListener("click", function () {
@@ -2985,21 +3036,19 @@ function spin() {
   const duration = 4200; // ms
   const canvas = document.getElementById("wheel-canvas");
   const startTime = performance.now();
-  let lastIndex = sliceIndexAt(slices, normalizeAngle(POINTER_ANGLE - startRotation));
+  let lastFrame = startTime;
+  flapLastPeg = -1;
 
   function frame(now) {
     const t = Math.min(1, (now - startTime) / duration);
+    const dt = Math.min(0.05, (now - lastFrame) / 1000);
+    lastFrame = now;
     const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
     const rotation = startRotation + totalDelta * eased;
     canvas.style.transform = "rotate(" + rotation + "rad)";
-    // Tick whenever the slice under the pointer changes (one per frame at most).
-    const idx = sliceIndexAt(slices, normalizeAngle(POINTER_ANGLE - rotation));
-    if (idx !== lastIndex) {
-      lastIndex = idx;
-      const speed = Math.pow(1 - t, 2); // derivative of the ease, scaled to 0..1
-      playTick(speed);
-      kickPointer();
-    }
+    // Wheel angular speed (rad/s): derivative of the ease-out curve.
+    const omega = totalDelta * 3 * Math.pow(1 - t, 2) / (duration / 1000);
+    stepFlapper(dt, slices, normalizeAngle(POINTER_ANGLE - rotation), omega);
     if (t < 1) {
       requestAnimationFrame(frame);
     } else {
@@ -3007,6 +3056,7 @@ function spin() {
       canvas.style.transform = "rotate(" + wheelRotation + "rad)";
       isSpinning = false;
       document.getElementById("spin-btn").disabled = false;
+      settleFlapper();
       playWin();
       onSpinComplete(winnerSlice.pet);
     }
