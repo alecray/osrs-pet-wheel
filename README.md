@@ -60,6 +60,9 @@ name.
   pet at your kc.
 - **Next milestone** — the result card also names the nearest upcoming target(s): hitting 1x/2x drop
   rate, and the next round-number kc milestone (100, 250, 500, 1,000, 2,000, 5,000, 10,000).
+- **Sync nudge** — a hint above the wheel prompts a refresh when kc hasn't been synced in over 3 days
+  (or was never synced), with a button that triggers the same Wise Old Man fetch as the button above
+  the hunt table.
 
 ## Editable rates
 

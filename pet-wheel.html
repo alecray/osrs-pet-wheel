@@ -463,6 +463,7 @@
 
   <div class="panel"><div class="corner-b"></div>
     <h2>3. Spin</h2>
+    <p class="hint" id="sync-nudge" style="display:none;"></p>
     <div class="row" style="margin-bottom:8px;">
       <label for="session-minutes" class="muted">Session length</label>
       <input type="number" id="session-minutes" min="1" step="5" value="90">
@@ -1922,6 +1923,7 @@ const CHUNK_MIN = 1;
 const CHUNK_MAX = 750;
 const CHUNK_STEPS = [1, 2, 3, 5, 10, 15, 20, 25, 50, 75, 100, 150, 200, 250, 300, 500, 750];
 const WOM_STALE_MS = 24 * 60 * 60 * 1000; // 24h
+const SYNC_NUDGE_MS = 3 * 24 * 3600 * 1000; // 3 days -- nudge to refresh kc on the spin panel
 
 function accountKey(suffix) {
   const slug = (rsn || "default").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_") || "default";
@@ -2256,6 +2258,41 @@ function formatAge(iso) {
   const hours = mins / 60;
   if (hours < 48) return hours.toFixed(1) + "h ago";
   return Math.round(hours / 24) + "d ago";
+}
+
+function formatDaysAgo(iso) {
+  const ms = Date.now() - Date.parse(iso);
+  if (Number.isNaN(ms)) return "a while ago";
+  const days = Math.round(ms / (24 * 3600 * 1000));
+  return days <= 1 ? "1 day ago" : days + " days ago";
+}
+
+/* ---------------------------------------------------------------------
+ * Nudge above the wheel to refresh kc when it's gotten stale (or was
+ * never synced) -- separate from the more granular #wom-staleness line,
+ * this one is meant to be seen right before spinning.
+ * ------------------------------------------------------------------- */
+function renderSyncNudge() {
+  const el = document.getElementById("sync-nudge");
+  el.innerHTML = "";
+  let text = null;
+  if (womPlayer && (Date.now() - Date.parse(womPlayer.fetched_at)) > SYNC_NUDGE_MS) {
+    text = "Player KC last synced " + formatDaysAgo(womPlayer.fetched_at) + " — ";
+  } else if (!womPlayer && rsn) {
+    text = "No KC synced yet — ";
+  }
+  if (!text) { el.style.display = "none"; return; }
+  el.appendChild(document.createTextNode(text));
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "secondary";
+  btn.textContent = womPlayer ? "Refresh now" : "Fetch from Wise Old Man";
+  btn.addEventListener("click", function () {
+    const fetchBtn = document.getElementById("fetch-wom-btn");
+    if (fetchBtn) fetchBtn.click();
+  });
+  el.appendChild(btn);
+  el.style.display = "block";
 }
 
 function renderWomStaleness() {
@@ -3461,6 +3498,7 @@ function render() {
   document.getElementById("rsn-label").textContent = rsn ? rsn : "no player set";
   document.getElementById("rsn-input").value = rsn;
   renderWomStaleness();
+  renderSyncNudge();
   sessionInput.value = String(sessionMinutes);
   renderCategoryTabs();
   renderHuntTable();
