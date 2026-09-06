@@ -488,6 +488,7 @@
       <button id="spin-btn">Spin (space)</button>
       <button class="secondary" id="mute-btn" title="Toggle spin sounds">🔊</button>
       <button class="secondary" id="lucky-btn" title="Bias the wheel toward hunted pets you're driest on (KC x rolls / rarity), without changing their displayed chance or P(dry)">Feeling lucky: off</button>
+      <button class="secondary" id="auto-remove-btn" title="When on, the pet you land on is unticked from the hunt list so the next spin can't repeat it">Auto remove: off</button>
     </div>
     <div id="result-card">
       <div class="pet-name" id="result-name"></div>
@@ -3284,6 +3285,26 @@ function renderLuckyBtn() {
 }
 renderLuckyBtn();
 
+function isAutoRemove() {
+  return lsGet(accountKey("autoRemove.v1")) === "on";
+}
+document.getElementById("auto-remove-btn").addEventListener("click", function () {
+  lsSet(accountKey("autoRemove.v1"), isAutoRemove() ? "off" : "on");
+  renderAutoRemoveBtn();
+});
+function renderAutoRemoveBtn() {
+  document.getElementById("auto-remove-btn").textContent = "Auto remove: " + (isAutoRemove() ? "on" : "off");
+}
+renderAutoRemoveBtn();
+
+function removeFromHunts(name) {
+  huntingSet.delete(name);
+  saveHunting();
+  renderHuntTable();
+  renderHuntingCount();
+  drawWheel();
+}
+
 function pickWeightedWinner(slices) {
   const roll = Math.random() * slices.reduce(function (sum, s) { return sum + s.weight; }, 0);
   let acc = 0;
@@ -3409,6 +3430,7 @@ function onSpinComplete(pet) {
   history = history.slice(0, HISTORY_LIMIT);
   saveHistory();
   renderHistory();
+  if (isAutoRemove()) removeFromHunts(pet.name);
 }
 
 function unitLabel(pet, count) {
@@ -3523,11 +3545,7 @@ document.getElementById("reroll-chunk-btn").addEventListener("click", function (
 
 document.getElementById("remove-hunt-btn").addEventListener("click", function () {
   if (!pendingResult) return;
-  huntingSet.delete(pendingResult.pet.name);
-  saveHunting();
-  renderHuntTable();
-  renderHuntingCount();
-  drawWheel();
+  removeFromHunts(pendingResult.pet.name);
 });
 
 document.getElementById("spin-btn").addEventListener("click", spin);
@@ -3656,6 +3674,7 @@ function render() {
   renderOwnedList();
   renderHiddenList();
   renderLuckyBtn();
+  renderAutoRemoveBtn();
   drawWheel();
   renderHistory();
 }
