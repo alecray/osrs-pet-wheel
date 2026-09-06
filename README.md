@@ -107,6 +107,14 @@ Action (`.github/workflows/check-pets.yml`) runs it every Monday and on PRs that
 opens or updates a `pet-data` issue when something is missing. Pets that are deliberately not
 huntable (cats, quest followers, Beaver metamorphs) are listed in `IGNORED_PAGES` in the script.
 
+### Checking the spin loop
+
+`spin_harness.js` runs one full spin of `pet-wheel.html` under Node with a stubbed DOM, Web Audio
+and `requestAnimationFrame`, and exits 1 if the page script throws, the spin never calls
+`onSpinComplete`, or the pointer flapper fails to settle. Run `node spin_harness.js` after touching
+the spin, wheel drawing, flapper or sound code (`/spin-check` in Claude Code does the same). The
+`check-pets` workflow runs it on every PR that touches `pet-wheel.html`.
+
 ## Known gaps
 
 - **Broav and Cat are permanently excluded from the wheel** (`build_pet_data.py`'s `EXCLUDED_PETS`):
