@@ -61,6 +61,13 @@ method" per skill, but real playstyles vary, so click into the fields to enter y
 method and wiki page the default came from, and flags whether the attempts/hour figure is
 wiki-stated or an estimate.
 
+## Hiding pets
+
+Each hunt-list row has a **Hide** button (shown on hover) for pets you never want to see, such as
+ones you don't intend to hunt. Hidden pets leave the list, the wheel, and "Select top 8 quickest".
+They are listed under **Hidden (N)** above the table with an **Unhide** button each, plus **Unhide
+all**. The hidden set is stored per RSN in `localStorage` and included in the Backup export.
+
 ## Privacy
 
 Everything lives in your browser's `localStorage` for this page, namespaced per RSN so multiple
