@@ -52,6 +52,11 @@ minutes); the wheel does one weighted spin and tells you how many attempts of th
 activity fit in that chunk, so you get a concrete task ("14 Zulrah kills") instead of an abstract pet
 name.
 
+- **Dry-o-meter** — the result card and hunt table's "Dry" column show expected rolls to date ÷
+  rarity as a multiplier (1.0x = exactly at drop rate), colour-coded from "spooned territory" (green)
+  through "on rate" to "dry"/"very dry" (red), plus the percentage of hunters who'd already have the
+  pet at your kc.
+
 ## Editable rates
 
 Skilling pets (the pure skill-training pets, plus Herbi and Quetzin) have editable rate and

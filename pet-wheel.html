@@ -239,6 +239,10 @@
   .pet-icon{ width: 22px; height: 22px; object-fit: contain; image-rendering: pixelated; vertical-align: middle; margin-right: 7px; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.9)); }
   .num{ text-align: right; font-variant-numeric: tabular-nums; }
   .muted{ color: var(--muted); }
+  .dry-spooned{ color: var(--green); }
+  .dry-onrate{ color: var(--muted); }
+  .dry-dry{ color: var(--gold); }
+  .dry-verydry{ color: var(--red); font-weight: 600; }
   .assumed::after{ content: "~"; color: var(--muted); margin-left: 2px; }
   #hunt-table-body input[type="number"]{ width: 64px; padding: 2px 4px; font-size: 0.92em; }
   .reset-btn{ padding: 3px 8px; font-size: 0.7em; }
@@ -446,6 +450,7 @@
             <th class="num">KC / Lvl</th>
             <th class="num">Chance so far</th>
             <th class="num">P(dry)</th>
+            <th class="num" title="Expected rolls to date &divide; rarity -- 1.0x is at drop rate">Dry</th>
             <th>Boost</th>
             <th></th>
           </tr>
@@ -481,6 +486,7 @@
         <span class="muted">(&asymp; <span id="result-minutes"></span> min)</span>
       </div>
       <div class="muted" id="result-chance-session"></div>
+      <div class="muted" id="result-dryometer"></div>
       <div class="row" style="margin-top:8px;">
         <button class="secondary" id="reroll-chunk-btn">Reroll chunk</button>
         <button class="secondary" id="remove-hunt-btn" title="Untick this pet in the hunt list so it leaves the wheel">Remove from hunts</button>
@@ -2548,6 +2554,17 @@ function renderHuntTable() {
     tdDry.className = "num";
     tdDry.textContent = (p.dryChance * 100).toFixed(1) + "%";
 
+    const tdDryMeter = document.createElement("td");
+    const dryInfo = drynessInfo(p);
+    if (dryInfo) {
+      tdDryMeter.className = "num " + dryInfo.cls;
+      tdDryMeter.textContent = dryInfo.multiplier.toFixed(1) + "x";
+      tdDryMeter.title = dryInfo.pct.toFixed(0) + "% of hunters would have it by now (" + dryInfo.word + ")";
+    } else {
+      tdDryMeter.className = "num muted";
+      tdDryMeter.textContent = "–";
+    }
+
     const tdBoost = document.createElement("td");
     const boostSelect = document.createElement("select");
     [0.5, 1, 2].forEach(function (value) {
@@ -2585,7 +2602,7 @@ function renderHuntTable() {
     hideBtn.addEventListener("click", function () { setHidden(p.name, true); });
     tdReset.appendChild(hideBtn);
 
-    tr.append(tdCheck, tdName, tdSource, tdRate, tdAttemptsPerHour, tdHours, tdKc, tdChance, tdDry, tdBoost, tdReset);
+    tr.append(tdCheck, tdName, tdSource, tdRate, tdAttemptsPerHour, tdHours, tdKc, tdChance, tdDry, tdDryMeter, tdBoost, tdReset);
     body.appendChild(tr);
   });
 }
@@ -3165,6 +3182,25 @@ function unitLabel(pet, count) {
   return count === 1 ? label.replace(/s$/, "") : label;
 }
 
+/* ---------------------------------------------------------------------
+ * Dry-o-meter: how far above/below drop rate the player's kc sits.
+ * multiplier 1.0 = exactly at drop rate (expected rolls == rarity).
+ * pct = "% of hunters would already have it" = pet.chance (same maths
+ * already used for the hunt table's Chance/P(dry) columns).
+ * ------------------------------------------------------------------- */
+function drynessInfo(pet) {
+  if (pet.kc === null || pet.kc <= 0) return null;
+  const rollsSoFar = pet.kc * pet.rollsPerAttempt;
+  const multiplier = rollsSoFar / pet.rarity;
+  const pct = pet.chance * 100;
+  let cls, word;
+  if (multiplier < 0.5) { cls = "dry-spooned"; word = "spooned territory"; }
+  else if (multiplier <= 1.5) { cls = "dry-onrate"; word = "on rate"; }
+  else if (multiplier <= 3) { cls = "dry-dry"; word = "dry"; }
+  else { cls = "dry-verydry"; word = "very dry"; }
+  return { multiplier: multiplier, pct: pct, cls: cls, word: word };
+}
+
 function showResult(pet, chunk) {
   document.getElementById("result-name").textContent = pet.name;
   document.getElementById("result-source").textContent = pet.source + " • 1/" + pet.rarity
@@ -3185,6 +3221,17 @@ function showResult(pet, chunk) {
   document.getElementById("result-minutes").textContent = chunk.minutes.toLocaleString();
   document.getElementById("result-chance-session").textContent =
     "P(pet this session) ≈ " + (chunk.chanceThisSession * 100).toFixed(1) + "%";
+  const dryEl = document.getElementById("result-dryometer");
+  const dryInfo = drynessInfo(pet);
+  if (dryInfo) {
+    dryEl.innerHTML = "Dry-o-meter: " + dryInfo.multiplier.toFixed(1) + "x drop rate ("
+      + '<span class="' + dryInfo.cls + '">' + dryInfo.word + "</span>), "
+      + dryInfo.pct.toFixed(0) + "% of hunters would have it by now";
+    dryEl.style.display = "block";
+  } else {
+    dryEl.textContent = "";
+    dryEl.style.display = "none";
+  }
   document.getElementById("result-card").classList.add("show");
 }
 
