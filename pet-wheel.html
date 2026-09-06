@@ -2970,7 +2970,7 @@ function stepFlapper(dt, slices, wheelAngle, omega) {
   if (flapAngle > 0.6) { flapAngle = 0.6; flapVel = Math.min(0, flapVel); }
   if (flapAngle < -0.12) { flapAngle = -0.12; flapVel = Math.max(0, flapVel); }
   document.querySelector(".pointer").style.transform =
-    "translateX(-50%) rotate(" + (flapAngle * 180 / Math.PI).toFixed(2) + "deg)";
+    "translateX(-50%) rotate(" + (-flapAngle * 180 / Math.PI).toFixed(2) + "deg)";
 }
 
 /* After the wheel stops, let the flapper finish its wobble on its own. */
