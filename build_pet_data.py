@@ -128,6 +128,22 @@ METHOD_NOTES = {
         "not added as a separate row -- treat this as the normal-mode best "
         "case. https://oldschool.runescape.wiki/w/Lil'_zik"
     ),
+    "Aggy": (
+        "Mad Angel, 1/2,000 tertiary drop (wiki-confirmed). The wiki lists "
+        "no kills/hour; ~3 min per kill is a placeholder estimate. "
+        "https://oldschool.runescape.wiki/w/Aggy"
+    ),
+    "Gull": (
+        "Shellbane Gryphon, 1/3,000 tertiary drop (wiki-confirmed). The wiki "
+        "lists no kills/hour; ~1.5 min per kill is a placeholder estimate. "
+        "https://oldschool.runescape.wiki/w/Gull_(pet)"
+    ),
+    "Maggot marquess": (
+        "Maggot King, 1/3,500 tertiary drop via the Open-stomach option "
+        "(wiki-confirmed). The wiki lists no kills/hour; ~4 min per kill is "
+        "a placeholder estimate. "
+        "https://oldschool.runescape.wiki/w/Maggot_marquess"
+    ),
     "Huberte": (
         "The Hueycoatl, 1/400 base rate scaled by personal damage "
         "contribution (wiki-confirmed exact figure; MVP/top-damage is NOT "
@@ -158,6 +174,9 @@ WOM_METRIC_BY_ACTIVITY = {
     "Callisto": "callisto",
     "Artio": "artio",
     "Doom of Mokhaiotl": "doom_of_mokhaiotl",
+    "Mad Angel": "mad_angel",
+    "Maggot King": "maggot_king",
+    "Shellbane Gryphon": "shellbane_gryphon",
     "Cerberus": "cerberus",
     "The Hueycoatl": "the_hueycoatl",
     "Alchemical Hydra": "alchemical_hydra",

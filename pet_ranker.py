@@ -38,6 +38,7 @@ HISCORES_URL = "https://secure.runescape.com/m=hiscore_oldschool/index_lite.json
 PETS = (
     ("Abyssal orphan", "Abyssal Sire", "Abyssal Sire", 2560, 2.5, 13262, False, "kill", 1),
     ("Abyssal protector", "Guardians of the Rift", "Rifts closed", 4000, 10.0, 26901, True, "game", 8),
+    ("Aggy", "Mad Angel", "Mad Angel", 2000, 3.0, 34042, False, "kill", 1),
     ("Baron", "Duke Sucellus", "Duke Sucellus", 2500, 2.5, 28250, False, "kill", 1),
     ("Beef", "Brutus", "Brutus", 1000, 2.0, 33124, False, "kill", 1),
     ("Bran", "The Royal Titans", "The Royal Titans", 3000, 3.0, 30622, False, "kill", 1),
@@ -46,6 +47,7 @@ PETS = (
     ("Callisto cub", "Artio", "Artio", 2800, 1.5, 13178, False, "kill", 1),
     ("Dom", "Doom of Mokhaiotl (delve 6)", "Doom of Mokhaiotl", 1000, 12.0, 31130, True, "kill", 1),
     ("Hellpuppy", "Cerberus", "Cerberus", 3000, 1.5, 13247, False, "kill", 1),
+    ("Gull", "Shellbane Gryphon", "Shellbane Gryphon", 3000, 1.5, 31285, False, "kill", 1),
     ("Huberte", "The Hueycoatl (MVP)", "The Hueycoatl", 400, 4.0, 30152, True, "kill", 1),
     ("Ikkle hydra", "Alchemical Hydra", "Alchemical Hydra", 3000, 2.0, 22746, False, "kill", 1),
     ("Jal-nib-rek", "The Inferno", "TzKal-Zuk", 100, 90.0, 21291, True, "kill", 1),
@@ -54,6 +56,7 @@ PETS = (
     ("Lil'viathan", "The Leviathan", "The Leviathan", 2500, 2.0, 28252, False, "kill", 1),
     ("Little nightmare", "The Nightmare (solo)", "The Nightmare", 800, 18.0, 24491, True, "kill", 1),
     ("Little nightmare", "Phosani's Nightmare", "Phosani's Nightmare", 1400, 8.0, 24491, False, "kill", 1),
+    ("Maggot marquess", "Maggot King", "Maggot King", 3500, 4.0, 33642, False, "kill", 1),
     ("Moxi", "Amoxliatl", "Amoxliatl", 3000, 1.5, 30154, False, "kill", 1),
     ("Muphin", "Phantom Muspah", "Phantom Muspah", 2500, 3.0, 27590, False, "kill", 1),
     ("Nexling", "Nex", "Nex", 500, 4.0, 26348, True, "kill", 1),
