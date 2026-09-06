@@ -3302,11 +3302,68 @@ function renderAutoRemoveBtn() {
 renderAutoRemoveBtn();
 
 function removeFromHunts(name) {
+  cancelPendingAutoRemove();
   huntingSet.delete(name);
   saveHunting();
   renderHuntTable();
   renderHuntingCount();
   drawWheel();
+}
+
+/* Auto-remove waits so the landed slice is still under the pointer for the
+ * reveal, then crossfades the old wheel into the redrawn one. A spin that
+ * starts during the wait applies the removal at once instead. */
+const AUTO_REMOVE_DELAY_MS = 2000;
+const AUTO_REMOVE_FADE_MS = 600;
+let pendingAutoRemove = null; // { name, timer }
+
+function cancelPendingAutoRemove() {
+  if (!pendingAutoRemove) return;
+  clearTimeout(pendingAutoRemove.timer);
+  pendingAutoRemove = null;
+}
+
+function flushPendingAutoRemove() {
+  if (!pendingAutoRemove) return;
+  const name = pendingAutoRemove.name;
+  cancelPendingAutoRemove();
+  removeFromHunts(name);
+}
+
+function scheduleAutoRemove(name) {
+  cancelPendingAutoRemove();
+  pendingAutoRemove = { name: name, timer: setTimeout(function () {
+    pendingAutoRemove = null;
+    removeFromHuntsAnimated(name);
+  }, AUTO_REMOVE_DELAY_MS) };
+}
+
+function snapshotCanvas(src) {
+  const c = document.createElement("canvas");
+  c.width = src.width; c.height = src.height;
+  c.getContext("2d").drawImage(src, 0, 0);
+  return c;
+}
+
+function removeFromHuntsAnimated(name) {
+  if (isSpinning || !huntingSet.has(name)) { if (!isSpinning) removeFromHunts(name); return; }
+  const canvas = document.getElementById("wheel-canvas");
+  const before = snapshotCanvas(canvas);
+  removeFromHunts(name); // redraws the new layout
+  const after = snapshotCanvas(canvas);
+  const ctx = canvas.getContext("2d");
+  const start = performance.now();
+  function frame(now) {
+    if (isSpinning) { drawWheel(); return; }
+    const t = Math.min(1, (now - start) / AUTO_REMOVE_FADE_MS);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(after, 0, 0);
+    ctx.globalAlpha = 1 - t;
+    ctx.drawImage(before, 0, 0);
+    ctx.globalAlpha = 1;
+    if (t < 1) requestAnimationFrame(frame); else drawWheel();
+  }
+  requestAnimationFrame(frame);
 }
 
 function pickWeightedWinner(slices) {
@@ -3326,6 +3383,7 @@ function normalizeAngle(a) {
 
 function spin() {
   if (isSpinning) return;
+  flushPendingAutoRemove();
   const slices = computeWeightedSlices(activeHuntingPets());
   if (slices.length === 0) {
     document.getElementById("snapshot-status").textContent = "";
@@ -3434,7 +3492,7 @@ function onSpinComplete(pet) {
   history = history.slice(0, HISTORY_LIMIT);
   saveHistory();
   renderHistory();
-  if (isAutoRemove()) removeFromHunts(pet.name);
+  if (isAutoRemove()) scheduleAutoRemove(pet.name);
 }
 
 function unitLabel(pet, count) {
