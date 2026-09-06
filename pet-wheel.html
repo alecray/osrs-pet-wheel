@@ -243,6 +243,7 @@
   .dry-onrate{ color: var(--muted); }
   .dry-dry{ color: var(--gold); }
   .dry-verydry{ color: var(--red); font-weight: 600; }
+  .kc-delta{ color: var(--green); font-size: 0.88em; }
   .assumed::after{ content: "~"; color: var(--muted); margin-left: 2px; }
   #hunt-table-body input[type="number"]{ width: 64px; padding: 2px 4px; font-size: 0.92em; }
   .reset-btn{ padding: 3px 8px; font-size: 0.7em; }
@@ -1939,6 +1940,7 @@ try {
 let rsn = "";                 // current player, drives the localStorage namespace
 let snapshot = null;          // parsed pet_ranker.py --json snapshot, or null (optional fallback)
 let womPlayer = null;         // { fetched_at, bosses: {metric: kills} } from WOM /players/{rsn}
+let womPlayerPrev = null;     // the womPlayer snapshot from before the most recent fetch, for kc deltas
 let womRates = null;          // { fetched_at, rates: {boss: killsPerHour} } from WOM efficiency rates (global)
 let huntingSet = new Set();   // pet names currently selected for the wheel
 let boosts = {};              // pet name -> 0.5 | 1 | 2 user weight multiplier
@@ -1983,6 +1985,10 @@ function loadState() {
   const rawWomPlayer = lsGet(accountKey("womPlayer.v1"));
   if (rawWomPlayer) {
     try { womPlayer = JSON.parse(rawWomPlayer); } catch (err) { womPlayer = null; }
+  }
+  const rawWomPlayerPrev = lsGet(accountKey("womPlayerPrev.v1"));
+  if (rawWomPlayerPrev) {
+    try { womPlayerPrev = JSON.parse(rawWomPlayerPrev); } catch (err) { womPlayerPrev = null; }
   }
   const rawHunting = lsGet(accountKey("hunting.v1"));
   if (rawHunting) {
@@ -2029,6 +2035,10 @@ function saveWomPlayer() {
   if (womPlayer) lsSet(accountKey("womPlayer.v1"), JSON.stringify(womPlayer));
   else lsRemove(accountKey("womPlayer.v1"));
 }
+function saveWomPlayerPrev() {
+  if (womPlayerPrev) lsSet(accountKey("womPlayerPrev.v1"), JSON.stringify(womPlayerPrev));
+  else lsRemove(accountKey("womPlayerPrev.v1"));
+}
 function saveWomRates() {
   if (womRates) lsSet(LS_WOM_RATES, JSON.stringify(womRates));
   else lsRemove(LS_WOM_RATES);
@@ -2042,12 +2052,14 @@ function saveWomRates() {
 function switchAccount(newRsn) {
   rsn = newRsn;
   saveCurrentRsn();
-  snapshot = null; womPlayer = null; huntingSet = new Set(); boosts = {}; history = [];
+  snapshot = null; womPlayer = null; womPlayerPrev = null; huntingSet = new Set(); boosts = {}; history = [];
   sessionMinutes = 90; activeCategory = "all"; overrides = {};
   const rawSnapshot = lsGet(accountKey("snapshot.v1"));
   if (rawSnapshot) { try { snapshot = JSON.parse(rawSnapshot); } catch (err) { /* ignore */ } }
   const rawWomPlayer = lsGet(accountKey("womPlayer.v1"));
   if (rawWomPlayer) { try { womPlayer = JSON.parse(rawWomPlayer); } catch (err) { /* ignore */ } }
+  const rawWomPlayerPrev = lsGet(accountKey("womPlayerPrev.v1"));
+  if (rawWomPlayerPrev) { try { womPlayerPrev = JSON.parse(rawWomPlayerPrev); } catch (err) { /* ignore */ } }
   const rawHunting = lsGet(accountKey("hunting.v1"));
   if (rawHunting) { try { huntingSet = new Set(JSON.parse(rawHunting)); } catch (err) { /* ignore */ } }
   const rawBoosts = lsGet(accountKey("boosts.v1"));
@@ -2098,6 +2110,8 @@ function recomputePets() {
   const womBosses = (womPlayer && womPlayer.bosses) ? womPlayer.bosses : {};
   const womActivities = (womPlayer && womPlayer.activities) ? womPlayer.activities : {};
   const womSkills = (womPlayer && womPlayer.skills) ? womPlayer.skills : {};
+  const womBossesPrev = (womPlayerPrev && womPlayerPrev.bosses) ? womPlayerPrev.bosses : {};
+  const womActivitiesPrev = (womPlayerPrev && womPlayerPrev.activities) ? womPlayerPrev.activities : {};
   const rates = (womRates && womRates.rates) ? womRates.rates : {};
 
   pets = DEFAULT_PETS.map(function (p) {
@@ -2115,6 +2129,13 @@ function recomputePets() {
       kc = kcByActivity[p.activity];
       kcSource = "hiscores";
     }
+
+    let kcPrev = null;
+    const womTablePrev = p.womType === "activity" ? womActivitiesPrev : womBossesPrev;
+    if (p.wom && Object.prototype.hasOwnProperty.call(womTablePrev, p.wom) && womTablePrev[p.wom] !== -1) {
+      kcPrev = womTablePrev[p.wom];
+    }
+    const kcDelta = (kc !== null && kcPrev !== null) ? kc - kcPrev : null;
 
     const skillLevel = p.womSkill && Object.prototype.hasOwnProperty.call(womSkills, p.womSkill)
       ? womSkills[p.womSkill] : null;
@@ -2141,6 +2162,8 @@ function recomputePets() {
       editable: editable,
       kc: kc,
       kcSource: kcSource,
+      kcPrev: kcPrev,
+      kcDelta: kcDelta,
       skillLevel: skillLevel,
       rarity: rarity,
       rollsPerAttempt: rollsPerAttempt,
@@ -2208,7 +2231,16 @@ async function fetchWomPlayer(name) {
   if (data && data.skills) {
     Object.keys(data.skills).forEach(function (metric) { skills[metric] = data.skills[metric].level; });
   }
-  womPlayer = { fetched_at: new Date().toISOString(), bosses: bosses, activities: activities, skills: skills };
+  const newPlayer = { fetched_at: new Date().toISOString(), bosses: bosses, activities: activities, skills: skills };
+  // Stash the outgoing snapshot as the "previous" baseline for kc-delta
+  // math, but only if it's not already the stashed one -- otherwise a
+  // second fetch shortly after the first would overwrite a real older
+  // baseline with a near-duplicate of the current data.
+  if (womPlayer && (!womPlayerPrev || womPlayerPrev.fetched_at !== womPlayer.fetched_at)) {
+    womPlayerPrev = womPlayer;
+    saveWomPlayerPrev();
+  }
+  womPlayer = newPlayer;
   saveWomPlayer();
   return womPlayer;
 }
@@ -2233,7 +2265,14 @@ function renderWomStaleness() {
     parts.push("Kill-rate table: " + age + (Date.now() - Date.parse(womRates.fetched_at) > WOM_STALE_MS ? " (stale, will refresh on next fetch)" : ""));
   }
   if (womPlayer) {
-    parts.push("Player KC: " + formatAge(womPlayer.fetched_at));
+    let line = "Player KC: " + formatAge(womPlayer.fetched_at);
+    if (womPlayerPrev) {
+      const totalDelta = pets.reduce(function (sum, p) { return sum + (p.kcDelta > 0 ? p.kcDelta : 0); }, 0);
+      if (totalDelta > 0) {
+        line += " • +" + totalDelta.toLocaleString() + " kc since " + formatAge(womPlayerPrev.fetched_at);
+      }
+    }
+    parts.push(line);
   }
   el.textContent = parts.join(" • ");
 }
@@ -2544,6 +2583,13 @@ function renderHuntTable() {
     } else {
       tdKc.textContent = p.kc === null ? "?" : p.kc.toLocaleString();
       if (p.kc !== null) tdKc.title = "source: " + p.kcSource;
+      if (p.kcDelta > 0) {
+        const deltaSpan = document.createElement("span");
+        deltaSpan.className = "kc-delta";
+        deltaSpan.textContent = " +" + p.kcDelta.toLocaleString();
+        deltaSpan.title = "kc gained since the previous Wise Old Man fetch";
+        tdKc.appendChild(deltaSpan);
+      }
     }
 
     const tdChance = document.createElement("td");

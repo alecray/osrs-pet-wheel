@@ -32,7 +32,9 @@ tooltip explaining why).
 
 - **[Wise Old Man](https://wiseoldman.net)** — boss KC, clue count, community-average kills/hour,
   and per-skill levels. Called directly from the page (its API sends CORS headers), so this works
-  even in file:// mode with no server running.
+  even in file:// mode with no server running. Each fetch keeps the previous kc snapshot around so
+  the hunt table can show a "+43" delta next to kc that changed, and the sync status line reports the
+  total kc gained since that previous fetch.
 - **[RuneProfile](https://runeprofile.com)** (via the [RuneProfile RuneLite
   plugin](https://runelite.net/plugin-hub/show/runeprofile)) — your real collection-log pet
   ownership, so owned pets drop off the wheel automatically. This is an **unofficial**, community-run
