@@ -2844,6 +2844,25 @@ function drawWheel() {
   ctx.strokeStyle = "#b8923f";
   ctx.lineWidth = 3;
   ctx.stroke();
+
+  // Pegs on every slice boundary, in the pointer's gold, reaching past the
+  // rim to the canvas edge so they visibly meet the flapper as they pass.
+  ctx.lineCap = "round";
+  currentWheelSlices.forEach(function (slice) {
+    const a = slice.start;
+    const x0 = cx + Math.cos(a) * (r - 14), y0 = cy + Math.sin(a) * (r - 14);
+    const x1 = cx + Math.cos(a) * (r + 4),  y1 = cy + Math.sin(a) * (r + 4);
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.strokeStyle = "#0a0806";
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    ctx.strokeStyle = "#e6c15c";
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+  });
+  ctx.lineCap = "butt";
 }
 
 /* ---------------------------------------------------------------------
