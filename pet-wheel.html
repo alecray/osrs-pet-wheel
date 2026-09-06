@@ -313,7 +313,15 @@
     border-top: 34px solid #e6c15c;
     filter: drop-shadow(1px 0 0 #0a0806) drop-shadow(-1px 0 0 #0a0806) drop-shadow(0 3px 3px rgba(0,0,0,0.8));
     z-index: 4;
+    transform-origin: 50% -34px; /* pivot at the knob above the tip */
   }
+  .pointer.tick{ animation: pointer-kick 140ms ease-out; }
+  @keyframes pointer-kick{
+    0%   { transform: translateX(-50%) rotate(0deg); }
+    30%  { transform: translateX(-50%) rotate(-14deg); }
+    100% { transform: translateX(-50%) rotate(0deg); }
+  }
+  #mute-btn{ padding: 11px 14px; font-size: 1.05em; }
   .pointer::before{
     content: ""; position:absolute; left: -7px; top: -34px; width: 0; height: 0;
     border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 24px solid #fbe8a8;
@@ -468,6 +476,7 @@
     </div>
     <div class="spin-row">
       <button id="spin-btn">Spin (space)</button>
+      <button class="secondary" id="mute-btn" title="Toggle spin sounds">🔊</button>
     </div>
     <div id="result-card">
       <div class="pet-name" id="result-name"></div>
@@ -2849,6 +2858,85 @@ function drawWheel() {
  * ------------------------------------------------------------------- */
 const POINTER_ANGLE = -Math.PI / 2; // pointer is fixed at the top (12 o'clock) of the wheel
 
+/* Synthesised sound effects via the Web Audio API: no files to load.
+ * The AudioContext is created lazily on the first spin (a user gesture),
+ * which is what browsers require before they will play anything. */
+let audioCtx = null;
+let soundOn = lsGet("sound.v1") !== "off";
+
+function getAudio() {
+  if (!soundOn) return null;
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    audioCtx = new AC();
+  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+/* Wooden "clack" as a slice boundary passes the pointer. `speed` in 0..1
+ * raises pitch and volume a touch so fast spins sound busier. */
+function playTick(speed) {
+  const ac = getAudio();
+  if (!ac) return;
+  const t = ac.currentTime;
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(900 + 500 * speed, t);
+  osc.frequency.exponentialRampToValueAtTime(250, t + 0.045);
+  gain.gain.setValueAtTime(0.18 + 0.12 * speed, t);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+  osc.connect(gain).connect(ac.destination);
+  osc.start(t);
+  osc.stop(t + 0.06);
+}
+
+/* Short ascending chime when the wheel lands. */
+function playWin() {
+  const ac = getAudio();
+  if (!ac) return;
+  const t0 = ac.currentTime;
+  [523.25, 659.25, 783.99, 1046.5].forEach(function (freq, i) {
+    const t = t0 + i * 0.09;
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, t);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.22, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    osc.connect(gain).connect(ac.destination);
+    osc.start(t);
+    osc.stop(t + 0.4);
+  });
+}
+
+function kickPointer() {
+  const el = document.querySelector(".pointer");
+  el.classList.remove("tick");
+  void el.offsetWidth; // restart the CSS animation
+  el.classList.add("tick");
+}
+
+function sliceIndexAt(slices, wheelAngle) {
+  for (let i = 0; i < slices.length; i++) {
+    if (wheelAngle >= slices[i].start && wheelAngle < slices[i].end) return i;
+  }
+  return slices.length - 1;
+}
+
+document.getElementById("mute-btn").addEventListener("click", function () {
+  soundOn = !soundOn;
+  lsSet("sound.v1", soundOn ? "on" : "off");
+  renderMuteBtn();
+});
+function renderMuteBtn() {
+  document.getElementById("mute-btn").textContent = soundOn ? "🔊" : "🔇";
+}
+renderMuteBtn();
+
 function pickWeightedWinner(slices) {
   const roll = Math.random() * slices.reduce(function (sum, s) { return sum + s.weight; }, 0);
   let acc = 0;
@@ -2890,12 +2978,21 @@ function spin() {
   const duration = 4200; // ms
   const canvas = document.getElementById("wheel-canvas");
   const startTime = performance.now();
+  let lastIndex = sliceIndexAt(slices, normalizeAngle(POINTER_ANGLE - startRotation));
 
   function frame(now) {
     const t = Math.min(1, (now - startTime) / duration);
     const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
     const rotation = startRotation + totalDelta * eased;
     canvas.style.transform = "rotate(" + rotation + "rad)";
+    // Tick whenever the slice under the pointer changes (one per frame at most).
+    const idx = sliceIndexAt(slices, normalizeAngle(POINTER_ANGLE - rotation));
+    if (idx !== lastIndex) {
+      lastIndex = idx;
+      const speed = Math.pow(1 - t, 2); // derivative of the ease, scaled to 0..1
+      playTick(speed);
+      kickPointer();
+    }
     if (t < 1) {
       requestAnimationFrame(frame);
     } else {
@@ -2903,6 +3000,7 @@ function spin() {
       canvas.style.transform = "rotate(" + wheelRotation + "rad)";
       isSpinning = false;
       document.getElementById("spin-btn").disabled = false;
+      playWin();
       onSpinComplete(winnerSlice.pet);
     }
   }
