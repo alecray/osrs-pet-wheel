@@ -480,6 +480,7 @@
       <div class="muted" id="result-chance-session"></div>
       <div class="row" style="margin-top:8px;">
         <button class="secondary" id="reroll-chunk-btn">Reroll chunk</button>
+        <button class="secondary" id="remove-hunt-btn" title="Untick this pet in the hunt list so it leaves the wheel">Remove from hunts</button>
       </div>
     </div>
   </div>
@@ -3004,6 +3005,15 @@ document.getElementById("reroll-chunk-btn").addEventListener("click", function (
     saveHistory();
     renderHistory();
   }
+});
+
+document.getElementById("remove-hunt-btn").addEventListener("click", function () {
+  if (!pendingResult) return;
+  huntingSet.delete(pendingResult.pet.name);
+  saveHunting();
+  renderHuntTable();
+  renderHuntingCount();
+  drawWheel();
 });
 
 document.getElementById("spin-btn").addEventListener("click", spin);
