@@ -8,6 +8,7 @@ on:
     paths:
       - "data/pets.json"
       - "check_pets.py"
+      - "test_check_pets.py"
       - "pet-wheel.html"
       - "spin_harness.js"
 
@@ -28,6 +29,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Run offline drift regression tests
+        run: python -m unittest -v test_check_pets.py
       - name: Run check_pets.py
         id: check
         run: |

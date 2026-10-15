@@ -37,12 +37,29 @@ USER_AGENT = "osrs-pet-wheel check_pets.py (https://github.com/alecray/osrs-pet-
 # followers, variants of an existing pet, and wiki meta pages.
 IGNORED_PAGES = {
     "Pet",
+    "Pet/Collection log",  # reference list, not an individual pet
     "Non-pet followers",
     "Metamorphosis",
     "Karamthulhu (unused pet)",
     # cats
     "Kitten", "Hellcat", "Lazy cat", "Overgrown cat", "Wily cat", "Toy cat",
     "Fishbowl (pet)",
+    # A Ruff Situation adoption followers, not random pet drops. Puppies
+    # cost 200 coins from Chase; adults are the same dogs after growth.
+    # https://oldschool.runescape.wiki/w/Puppy#Breeds
+    "Dog", "Puppy",
+    "Bernese Mountain Dog", "Bernese Mountain Dog puppy",
+    "Border Collie", "Border Collie puppy",
+    "Chihuahua", "Chihuahua puppy",
+    "Corgi", "Corgi puppy",
+    "Greyhound", "Greyhound puppy",
+    "Husky", "Husky puppy",
+    "Labrador", "Labrador puppy",
+    "Pug", "Pug puppy",
+    "Samoyed", "Samoyed puppy",
+    "Shiba", "Shiba puppy",
+    "Spaniel", "Spaniel puppy",
+    "Yorkie", "Yorkie puppy",
     # quest / one-off followers
     "Baby Mole", "Pet rock", "Humphrey Dumphrey", "Mayor of Catherby", "Mr McGroot",
     "Dr banikan (item)", "Elias white (item)", "Gary (item)", "Gnome child (item)",
