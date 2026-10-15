@@ -119,7 +119,13 @@ from the wheel permanently regardless of any rate data — see "Known gaps" belo
 leaves the hunt list). Run it locally with `python check_pets.py`; it exits 1 on drift. A GitHub
 Action (`.github/workflows/check-pets.yml`) runs it every Monday and on PRs that touch the data, and
 opens or updates a `pet-data` issue when something is missing. Pets that are deliberately not
-huntable (cats, quest followers, Beaver metamorphs) are listed in `IGNORED_PAGES` in the script.
+huntable drops (cats, quest followers, Beaver metamorphs, and the Dog/Puppy overview pages plus
+all 12 adopted dog breeds and their puppies) and wiki reference lists such as `Pet/Collection log`
+are listed in `IGNORED_PAGES` in the script. The
+[dogs](https://oldschool.runescape.wiki/w/Dog) unlocked by A Ruff Situation are adopted from Chase
+for 200 coins as puppies and raised into adults, so they do not supply a random-drop hunt rate.
+Bloodhound and Hellpuppy remain huntable pets. Run the offline drift-classification regression
+checks with `python -m unittest -v test_check_pets.py`.
 
 ### Checking the spin loop
 
